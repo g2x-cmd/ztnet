@@ -136,6 +136,33 @@ interface GetOptionsResponse {
 	};
 }
 
+function isSafeUrl(url: string): boolean {
+	try {
+		const parsed = new URL(url);
+		if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+		const hostname = parsed.hostname;
+		if (
+			hostname === "localhost" ||
+			hostname === "127.0.0.1" ||
+			hostname === "0.0.0.0" ||
+			hostname === "::1" ||
+			hostname.startsWith("10.") ||
+			hostname.startsWith("172.16.") ||
+			hostname.startsWith("192.168.") ||
+			hostname.startsWith("169.254.") ||
+			hostname.startsWith("fc") ||
+			hostname.startsWith("fd") ||
+			hostname.endsWith(".internal") ||
+			hostname.endsWith(".local")
+		) {
+			return false;
+		}
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 const getOptions = async (
 	ctx: UserContext,
 	isCentral = false,
@@ -144,8 +171,10 @@ const getOptions = async (
 		await getApiCredentials(ctx);
 
 	if (isCentral) {
+		const safeUrl =
+			ztCentralApiUrl && isSafeUrl(ztCentralApiUrl) ? ztCentralApiUrl : CENTRAL_ZT_ADDR;
 		return {
-			ztCentralApiUrl: ztCentralApiUrl || CENTRAL_ZT_ADDR,
+			ztCentralApiUrl: safeUrl,
 			localControllerUrl: null,
 			headers: {
 				Authorization: `token ${ztCentralApiKey}`,

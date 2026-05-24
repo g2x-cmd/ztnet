@@ -27,6 +27,11 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
 		return;
 	}
 
+	if (session.user.role !== "ADMIN") {
+		res.status(403).json({ message: "Forbidden" });
+		return;
+	}
+
 	if (req.method === "GET") {
 		try {
 			const folderPath = path.resolve(`${ZT_FOLDER}/zt-mkworld`);

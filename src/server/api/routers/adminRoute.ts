@@ -6,7 +6,7 @@ import { type GlobalOptions, Role } from "@prisma/client";
 import { throwError } from "~/server/helpers/errorHandler";
 import type { ZTControllerNodeStatus } from "~/types/ztController";
 import type { NetworkAndMemberResponse } from "~/types/network";
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import fs from "node:fs";
 import type { WorldConfig } from "~/types/worldConfig";
 import axios from "axios";
@@ -45,6 +45,22 @@ function getSqliteDatabasePath() {
 	return path.isAbsolute(sqlitePath)
 		? sqlitePath
 		: path.resolve(process.cwd(), sqlitePath);
+}
+
+const SAFE_FILENAME_RE = /^[a-zA-Z0-9._-]+\.tar\.gz$/;
+const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
+
+function assertSafeBackupFileName(name: string) {
+	if (!SAFE_FILENAME_RE.test(name)) {
+		throwError("Invalid backup filename");
+	}
+}
+
+function assertPathInsideDir(target: string, dir: string) {
+	const rel = path.relative(dir, target);
+	if (rel.startsWith("..") || path.isAbsolute(rel)) {
+		throwError("Invalid file path");
+	}
 }
 
 export const adminRouter = createTRPCRouter({
@@ -1333,7 +1349,10 @@ export const adminRouter = createTRPCRouter({
 			z.object({
 				includeDatabase: z.boolean().default(true),
 				includeZerotier: z.boolean().default(true),
-				backupName: z.string().optional(),
+				backupName: z
+					.string()
+					.regex(/^[a-zA-Z0-9._-]+$/, "Invalid backup name")
+					.optional(),
 			}),
 		)
 		.mutation(async ({ input }) => {
@@ -1403,8 +1422,8 @@ export const adminRouter = createTRPCRouter({
 
 					// Create tar.gz archive using system tar command
 					try {
-						// Change to temp directory and create archive with relative paths
-						execSync(`cd "${tempDir}" && tar -czf "${backupPath}" .`, {
+						execFileSync("tar", ["-czf", backupPath, "."], {
+							cwd: tempDir,
 							stdio: ["pipe", "pipe", "inherit"],
 						});
 					} catch (error) {
@@ -1449,6 +1468,8 @@ export const adminRouter = createTRPCRouter({
 		)
 		.mutation(async ({ input }) => {
 			try {
+				assertSafeBackupFileName(input.fileName);
+
 				const backupDir = path.join(process.cwd(), "tmp", "backups");
 				const filePath = path.join(backupDir, input.fileName);
 
@@ -1456,12 +1477,7 @@ export const adminRouter = createTRPCRouter({
 					throwError("Backup file not found");
 				}
 
-				// Security check - ensure file is within backup directory
-				const resolvedPath = path.resolve(filePath);
-				const resolvedBackupDir = path.resolve(backupDir);
-				if (!resolvedPath.startsWith(resolvedBackupDir)) {
-					throwError("Invalid file path");
-				}
+				assertPathInsideDir(path.resolve(filePath), path.resolve(backupDir));
 
 				const fileBuffer = fs.readFileSync(filePath);
 				return {
@@ -1513,15 +1529,12 @@ export const adminRouter = createTRPCRouter({
 		)
 		.mutation(async ({ input }) => {
 			try {
+				assertSafeBackupFileName(input.fileName);
+
 				const backupDir = path.join(process.cwd(), "tmp", "backups");
 				const filePath = path.join(backupDir, input.fileName);
 
-				// Security check
-				const resolvedPath = path.resolve(filePath);
-				const resolvedBackupDir = path.resolve(backupDir);
-				if (!resolvedPath.startsWith(resolvedBackupDir)) {
-					throwError("Invalid file path");
-				}
+				assertPathInsideDir(path.resolve(filePath), path.resolve(backupDir));
 
 				if (fs.existsSync(filePath)) {
 					fs.unlinkSync(filePath);
@@ -1542,39 +1555,48 @@ export const adminRouter = createTRPCRouter({
 		)
 		.mutation(async ({ input }) => {
 			try {
+				assertSafeBackupFileName(input.fileName);
+
 				const backupDir = path.join(process.cwd(), "tmp", "backups");
 				const backupPath = path.join(backupDir, input.fileName);
 				const extractDir = path.join(backupDir, "extract", Date.now().toString());
 
-				// Security check
-				const resolvedPath = path.resolve(backupPath);
-				const resolvedBackupDir = path.resolve(backupDir);
-				if (!resolvedPath.startsWith(resolvedBackupDir)) {
-					throwError("Invalid file path");
-				}
+				assertPathInsideDir(path.resolve(backupPath), path.resolve(backupDir));
 
 				if (!fs.existsSync(backupPath)) {
 					throwError("Backup file not found");
 				}
 
-				// Create extraction directory
+				const backupStats = fs.statSync(backupPath);
+				if (backupStats.size > MAX_UPLOAD_BYTES) {
+					throwError("Backup file exceeds maximum allowed size");
+				}
+
 				fs.mkdirSync(extractDir, { recursive: true });
 
-				// Extract backup using tar (available by default on Debian and FreeBSD)
 				try {
-					// Determine compression type from file extension
-					let tarOptions = "-xf";
+					let tarFlag = "-xf";
 					if (input.fileName.endsWith(".tar.gz") || input.fileName.endsWith(".tgz")) {
-						tarOptions = "-xzf";
+						tarFlag = "-xzf";
 					} else if (input.fileName.endsWith(".tar.bz2")) {
-						tarOptions = "-xjf";
+						tarFlag = "-xjf";
 					} else if (input.fileName.endsWith(".tar.xz")) {
-						tarOptions = "-xJf";
+						tarFlag = "-xJf";
 					}
 
-					execSync(`tar ${tarOptions} "${backupPath}" -C "${extractDir}"`, {
+					execFileSync("tar", [tarFlag, backupPath, "-C", extractDir], {
 						stdio: ["pipe", "pipe", "inherit"],
 					});
+
+					const extractedItems = fs.readdirSync(extractDir, {
+						recursive: true,
+						withFileTypes: true,
+					});
+					for (const item of extractedItems) {
+						if (item.name.startsWith("..") || path.isAbsolute(item.name)) {
+							throwError("Backup contains unsafe path entries");
+						}
+					}
 				} catch (extractError) {
 					throw new Error(`Failed to extract backup: ${extractError.message}`);
 				}
@@ -1826,27 +1848,24 @@ export const adminRouter = createTRPCRouter({
 		.input(
 			z.object({
 				fileName: z.string(),
-				fileData: z.string(), // base64 encoded file data
+				fileData: z.string(),
 			}),
 		)
 		.mutation(async ({ input }) => {
 			try {
+				assertSafeBackupFileName(input.fileName);
+
 				const backupDir = path.join(process.cwd(), "tmp", "backups");
 				fs.mkdirSync(backupDir, { recursive: true });
 
 				const filePath = path.join(backupDir, input.fileName);
+				assertPathInsideDir(path.resolve(filePath), path.resolve(backupDir));
 
-				// Security check - ensure filename is safe
-				if (
-					!input.fileName.endsWith(".tar.gz") ||
-					input.fileName.includes("..") ||
-					input.fileName.includes("/")
-				) {
-					throwError("Invalid filename");
+				const fileBuffer = Buffer.from(input.fileData, "base64");
+				if (fileBuffer.length > MAX_UPLOAD_BYTES) {
+					throwError("Uploaded file exceeds maximum allowed size");
 				}
 
-				// Convert base64 to buffer and save - fix the Buffer type issue
-				const fileBuffer = Buffer.from(input.fileData, "base64");
 				fs.writeFileSync(filePath, new Uint8Array(fileBuffer));
 
 				const stats = fs.statSync(filePath);
