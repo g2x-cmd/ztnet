@@ -231,14 +231,10 @@ export const mfaAuthRouter = createTRPCRouter({
 					});
 				}
 
-
 				const recoveryCodes = recoveryCodesFromJson(user.twoFactorRecoveryCodes);
 
 				// Verify the recovery code
-				const isValidRecoveryCode = await verifyRecoveryCode(
-					recoveryCode,
-					recoveryCodes,
-				);
+				const isValidRecoveryCode = await verifyRecoveryCode(recoveryCode, recoveryCodes);
 
 				if (!isValidRecoveryCode) {
 					throw new TRPCError({

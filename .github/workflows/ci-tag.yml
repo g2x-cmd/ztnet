@@ -44,20 +44,15 @@ jobs:
       - name: Set image name
         run: echo "IMAGE_NAME=ghcr.io/${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
 
-      - name: "Get Previous tag"
-        id: previoustag
-        uses: "WyriHaximus/github-action-get-previous-tag@v1"
-
-      - name: Extract version number
-        id: extract_version
+      - name: Set image version
         run: |
-          echo "raw_tag=${{ steps.previoustag.outputs.tag }}"
-          version_number="${{ steps.previoustag.outputs.tag }}"
-          if [[ ${version_number:0:1} == "v" ]]; then
-            version_number=${version_number:1}
+          version="${{ github.event.inputs.version }}"
+          if [[ -z "$version" ]]; then
+            version="${GITHUB_REF_NAME}"
           fi
-          echo "version_number=$version_number"
-          echo "::set-output name=version_number::$version_number"
+          version_number="${version#v}"
+          echo "IMAGE_VERSION=$version" >> $GITHUB_ENV
+          echo "IMAGE_VERSION_NUMBER=$version_number" >> $GITHUB_ENV
 
       - name: Build and push
         id: docker_build
@@ -68,10 +63,10 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           build-args: |
-            "NEXT_PUBLIC_APP_VERSION=${{ steps.previoustag.outputs.tag }}"
+            "NEXT_PUBLIC_APP_VERSION=${{ env.IMAGE_VERSION }}"
           tags: |
             ${{ env.IMAGE_NAME }}:latest
-            ${{ env.IMAGE_NAME }}:${{ steps.extract_version.outputs.version_number }}
+            ${{ env.IMAGE_NAME }}:${{ env.IMAGE_VERSION_NUMBER }}
 
       # - uses: "marvinpinto/action-automatic-releases@latest"
       #   with:
