@@ -16,7 +16,7 @@ export const publicRouter = createTRPCRouter({
 		});
 
 		return {
-			enableRegistration: options?.enableRegistration ?? true,
+			enableRegistration: options?.enableRegistration ?? false,
 			oauthExclusiveLogin,
 			oauthAllowNewUsers,
 		};

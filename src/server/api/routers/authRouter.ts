@@ -162,7 +162,7 @@ export const authRouter = createTRPCRouter({
 				})());
 
 			// check if enableRegistration is true
-			if (settings?.enableRegistration === false && !hasValidCode && !decryptedOrgToken) {
+			if (settings?.enableRegistration !== true && !hasValidCode && !decryptedOrgToken) {
 				throw new TRPCError({
 					code: "BAD_REQUEST",
 					message: "Registration is disabled! Please contact the administrator.",

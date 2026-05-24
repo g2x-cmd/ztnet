@@ -66,7 +66,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 RUN apt update && apt install -y curl sudo ca-certificates gnupg && \
-    curl -s https://install.zerotier.com | bash && \
+    curl -fsSL https://raw.githubusercontent.com/zerotier/ZeroTierOne/master/doc/contact%40zerotier.com.gpg | gpg --dearmor -o /usr/share/keyrings/zerotier.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/zerotier.gpg] http://download.zerotier.com/debian/bookworm bookworm main" > /etc/apt/sources.list.d/zerotier.list && \
+    apt update && apt install -y zerotier-one && \
     apt clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 # Update npm to latest version to suppress update notices
 RUN npm install -g npm@latest
@@ -75,7 +77,7 @@ RUN npm install @prisma/client@6.16.3 @paralleldrive/cuid2
 RUN npm install -g prisma@6.16.3 ts-node
 RUN mkdir -p /var/lib/zerotier-one /app/data && \
     chown -R nextjs:nodejs /var/lib/zerotier-one /app/data && \
-    chmod -R 777 /var/lib/zerotier-one /app/data
+    chmod -R 770 /var/lib/zerotier-one /app/data
 
 COPY --from=builder /app/next.config.mjs ./
 COPY --from=builder /app/public ./public

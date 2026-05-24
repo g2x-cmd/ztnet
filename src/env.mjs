@@ -5,11 +5,23 @@ import { z } from "zod";
  * built with invalid env vars.
  */
 const server = z.object({
-	DATABASE_URL: z.string().min(1),
+	DATABASE_URL: z
+		.string()
+		.refine(
+			(value) =>
+				value.startsWith("file:") &&
+				!value.includes("\0") &&
+				!value.includes("..") &&
+				!value.startsWith("file:/etc/") &&
+				!value.startsWith("file:/proc/") &&
+				!value.startsWith("file:/sys/") &&
+				!value.startsWith("file:/dev/"),
+			"DATABASE_URL must be a safe SQLite file URL",
+		),
 	NODE_ENV: z.enum(["development", "test", "production"]),
 	NEXTAUTH_SECRET:
 		process.env.NODE_ENV === "production"
-			? z.string().min(1)
+			? z.string().min(32)
 			: z.string().min(1).optional(),
 	NEXTAUTH_URL: z.preprocess(
 		// This makes Vercel deployments not fail if you don't set NEXTAUTH_URL

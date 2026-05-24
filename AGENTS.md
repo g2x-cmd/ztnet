@@ -22,9 +22,9 @@
 
 ## Env, Prisma, And Build Gotchas
 - Next config imports `src/env.mjs` unless `SKIP_ENV_VALIDATION` is set; builds/tests need at least `DATABASE_URL`, `NEXTAUTH_URL`, and usually `NEXTAUTH_SECRET`.
-- GitHub app workflows create a dummy `.env` with `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres?schema=public`, `NEXTAUTH_SECRET=dummy_key`, `NEXTAUTH_URL=http://localhost:3000`, `NEXT_PUBLIC_APP_VERSION=`, and `IS_GITHUB_ACTION=true`.
-- Prisma config loads `.env`, uses schema folder `./prisma`, migrations in `prisma/migrations`, and seed command `tsx prisma/seed.ts`.
-- Prisma uses PostgreSQL plus `MIGRATE_DATABASE_URL` as the shadow database URL; update `.env.example` and `src/env.mjs` together when adding env vars.
+- GitHub app workflows create a dummy `.env` with `DATABASE_URL=file:./data/ztnet.sqlite`, `NEXTAUTH_SECRET=dummy_key`, `NEXTAUTH_URL=http://localhost:3000`, `NEXT_PUBLIC_APP_VERSION=`, and `IS_GITHUB_ACTION=true`.
+- Prisma config loads `.env`, uses schema folder `./prisma`, and seed command `tsx prisma/seed.ts`.
+- This branch uses SQLite; `init-db.sh` runs `prisma db push` only for a missing DB file and then runs `prisma db seed`.
 - `next.config.mjs` sets `output: "standalone"`; production start uses `node .next/standalone/server.js`, not `next start`.
 
 ## Style Notes

@@ -435,7 +435,7 @@ export async function onUserCreateBefore(
 				where: { id: 1 },
 				select: { enableRegistration: true },
 			});
-			if (settings?.enableRegistration === false) {
+			if (settings?.enableRegistration !== true) {
 				throw new APIError("FORBIDDEN", {
 					message: "registration_disabled",
 				});

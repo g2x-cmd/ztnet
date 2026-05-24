@@ -15,6 +15,7 @@ cmd="$@"
 
 DATA_DIR="${SQLITE_DIR:-/app/data}"
 mkdir -p "$DATA_DIR" /var/lib/zerotier-one
+chmod 770 "$DATA_DIR" /var/lib/zerotier-one
 
 export DATABASE_URL="${DATABASE_URL:-file:${DATA_DIR}/ztnet.sqlite}"
 export ZT_ADDR="${ZT_ADDR:-http://127.0.0.1:9993}"
@@ -35,6 +36,7 @@ fi
 
 # Create .env file for Prisma and Next runtime reads.
 echo "Creating .env file..."
+umask 077
 cat << EOF > .env
 DATABASE_URL=${DATABASE_URL}
 ZT_ADDR=${ZT_ADDR}
@@ -68,10 +70,15 @@ function apply_path {
 
 # apply_path
 
-# SQLite experimental mode: create/update schema directly for fresh installs.
-echo "Applying Prisma schema to SQLite database..."
-npx prisma db push --accept-data-loss
-echo "Database schema applied successfully!"
+# SQLite experimental mode: initialize schema only when the database file is absent.
+DB_FILE="${DATABASE_URL#file:}"
+if [[ "$DB_FILE" = /* ]] && [[ -s "$DB_FILE" ]]; then
+  echo "SQLite database already exists; skipping schema push."
+else
+  echo "Applying Prisma schema to SQLite database..."
+  npx prisma db push --accept-data-loss
+  echo "Database schema applied successfully!"
+fi
 
 # seed the database
 echo "Seeding the database..."

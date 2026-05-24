@@ -22,7 +22,7 @@ services:
       ZT_ADDR: "http://127.0.0.1:9993"
       ZT_SECRET_FILE: "/var/lib/zerotier-one/authtoken.secret"
       NEXTAUTH_URL: "http://localhost:3000"
-      NEXTAUTH_SECRET: "random_secret"
+      NEXTAUTH_SECRET: "replace_with_random_32_byte_secret"
 
 volumes:
   ztnet-data:
