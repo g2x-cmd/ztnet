@@ -1,10 +1,10 @@
 # create github action that will build nextjs application and push it to docker hub and tag with commit hash
 # apply this to every push to dev and pull request
-name: Build on every push to main
+name: Build on every push to ztnet-sqlte
 on:
   push:
     branches:
-      - main
+      - ztnet-sqlte
     paths-ignore:
       - "docs/**"
       - "install.ztnet/**"
@@ -14,6 +14,10 @@ on:
       - "CONTRIBUTING.md"
 
   workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   web_lint_test:
@@ -57,22 +61,21 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
-      - id: lowercaseRepo
-        uses: ASzc/change-string-case-action@v5
-        with:
-          string: ${{ github.repository }}
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Login to DockerHub
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v2
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create short sha
         run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Set image name
+        run: echo "IMAGE_NAME=ghcr.io/${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
 
       - name: Build and push
         id: docker_build
@@ -85,4 +88,5 @@ jobs:
             "NEXT_PUBLIC_APP_VERSION=${{ github.ref_name }}-${{ env.SHORT_SHA }}"
           # platforms: linux/amd64,linux/arm64,linux/arm/v7
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:dev-${{ env.SHORT_SHA }}
+            ${{ env.IMAGE_NAME }}:dev-${{ env.SHORT_SHA }}
+            ${{ env.IMAGE_NAME }}:ztnet-sqlte

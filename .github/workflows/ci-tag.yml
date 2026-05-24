@@ -15,13 +15,17 @@ on:
         description: "Release version (e.g. v0.0.2)"
         required: true
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with:
-          ref: main
+          ref: ztnet-sqlte
           fetch-depth: 0
 
       - name: Set up QEMU
@@ -30,11 +34,15 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Login to DockerHub
-        uses: docker/login-action@v1
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set image name
+        run: echo "IMAGE_NAME=ghcr.io/${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
 
       - name: "Get Previous tag"
         id: previoustag
@@ -62,8 +70,8 @@ jobs:
           build-args: |
             "NEXT_PUBLIC_APP_VERSION=${{ steps.previoustag.outputs.tag }}"
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest
-            ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:${{ steps.extract_version.outputs.version_number }}
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ steps.extract_version.outputs.version_number }}
 
       # - uses: "marvinpinto/action-automatic-releases@latest"
       #   with:
