@@ -1038,21 +1038,97 @@ export const adminRouter = createTRPCRouter({
 			}
 		}),
 	getIdentity: adminRoleProtectedRoute.query(async () => {
-		let ip = "External IP";
-		try {
-			const response = await axios.get("https://api.ip.sb/ip");
-			ip = response.data.trim();
-		} catch (error) {
-			console.error("Failed to fetch public IP:", error);
+		const IPV4_SERVICES = [
+			"https://ddns.oray.com/checkip",
+			"https://ip.3322.net",
+			"https://4.ipw.cn",
+			"https://v4.yinghualuo.cn/bejson",
+			"https://myip.ipip.net",
+		];
+		const IPV6_SERVICES = [
+			"https://speed.neu6.edu.cn/getIP.php",
+			"https://v6.ident.me",
+			"https://6.ipw.cn",
+			"https://v6.yinghualuo.cn/bejson",
+		];
+
+		const IP_REGEX = /((?:\d{1,3}\.){3}\d{1,3})/;
+		const IPV6_REGEX = /([0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{1,4}){5,7})/;
+
+		async function fetchFromServices(
+			services: string[],
+			regex: RegExp,
+			perRequestTimeout = 3000,
+			totalTimeout = 8000,
+		): Promise<string | null> {
+			const controller = new AbortController();
+			const timer = setTimeout(() => controller.abort(), totalTimeout);
+			let result: string | null = null;
+			for (const url of services) {
+				if (controller.signal.aborted) break;
+				try {
+					const res = await axios.get(url, {
+						timeout: perRequestTimeout,
+						signal: controller.signal,
+					});
+					const match = res.data.toString().match(regex);
+					if (match?.[1]) {
+						result = match[1];
+						break;
+					}
+				} catch {
+					// try next
+				}
+			}
+			clearTimeout(timer);
+			return result;
 		}
 
-		// Get identity from the file system
+		function getLocalIPs(): { ipv4: string[]; ipv6: string[] } {
+			const ipv4: string[] = [];
+			const ipv6: string[] = [];
+			try {
+				const os = require("node:os") as typeof import("node:os");
+				const interfaces = os.networkInterfaces();
+				for (const entries of Object.values(interfaces)) {
+					if (!entries) continue;
+					for (const entry of entries) {
+						if (entry.internal) continue;
+						const addr = entry.address;
+						if (/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.)/.test(addr))
+							continue;
+						if (/^fe80:/i.test(addr)) continue;
+						if (entry.family === "IPv4" && /^(?:\d{1,3}\.){3}\d{1,3}$/.test(addr)) {
+							ipv4.push(addr);
+						} else if (
+							entry.family === "IPv6" &&
+							/^[0-9a-fA-F]{1,4}(:[0-9a-fA-F]{1,4}){5,7}$/.test(addr)
+						) {
+							ipv6.push(addr);
+						}
+					}
+				}
+			} catch {
+				// ignore
+			}
+			return { ipv4, ipv6 };
+		}
+
+		const [publicIPv4, publicIPv6] = await Promise.all([
+			fetchFromServices(IPV4_SERVICES, IP_REGEX),
+			fetchFromServices(IPV6_SERVICES, IPV6_REGEX),
+		]);
+		const localIPs = getLocalIPs();
+
+		const ipv4 = publicIPv4 || (localIPs.ipv4.length > 0 ? localIPs.ipv4[0] : null);
+		const ipv6 = publicIPv6 || (localIPs.ipv6.length > 0 ? localIPs.ipv6[0] : null);
+
 		const identityPath = `${ZT_FOLDER}/identity.public`;
 		const identity = fs.existsSync(identityPath)
 			? fs.readFileSync(identityPath, "utf-8").trim()
 			: "";
 
-		return { ip, identity };
+		return { ipv4, ipv6, localIPv4: localIPs.ipv4, localIPv6: localIPs.ipv6, identity };
 	}),
 	getPlanet: adminRoleProtectedRoute.query(async ({ ctx }) => {
 		const paths = {

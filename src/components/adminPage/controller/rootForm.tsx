@@ -110,13 +110,15 @@ const RootForm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
 	useEffect(() => {
 		setWorld((prev) => {
-			// Use existing data from getOptions.rootNodes if available
 			const rootNodesData =
 				getPlanet?.rootNodes.length > 0
 					? getPlanet?.rootNodes
 					: [
 							{
-								endpoints: [`${getIdentity?.ip}/9993`],
+								endpoints: [
+									getIdentity?.ipv4 && `${getIdentity?.ipv4}/9993`,
+									getIdentity?.ipv6 && `${getIdentity?.ipv6}/9993`,
+								].filter(Boolean),
 								identity: getIdentity?.identity || "",
 								comments: "",
 							},
