@@ -37,6 +37,24 @@ With a rich palette of features, and an intuitive user interface, ZTNET embodies
 
 ### [See Installation Instruction](https://ztnet.network/installation/docker-compose)
 
+## SQLite Single-Container Variant
+
+This branch is an experimental SQLite/single-container build:
+
+- The application uses Prisma with SQLite instead of PostgreSQL.
+- `docker-compose.yml` runs one `ztnet` service and persists SQLite at `/app/data/ztnet.sqlite`.
+- The same container starts the ZeroTier daemon and stores its state in `/var/lib/zerotier-one`.
+- Fresh installs initialize the schema with `prisma db push` and seed `GlobalOptions`; existing PostgreSQL data is not migrated.
+
+Build and run with Docker Compose:
+
+```bash
+docker compose up -d --build
+docker compose logs -f ztnet
+```
+
+For local Next.js testing, use a SQLite URL such as `DATABASE_URL=file:./data/ztnet.sqlite`, then run `npx prisma db push --accept-data-loss` and `npx prisma db seed` before starting the app.
+
 ## 📷 Images
 View the following images for a visual overview of the ZTNet application:
 <details>

@@ -45,6 +45,10 @@ async function verifyRecoveryCode(
 	return false;
 }
 
+function recoveryCodesFromJson(value: unknown): string[] {
+	return Array.isArray(value) ? value.filter((code) => typeof code === "string") : [];
+}
+
 export const mfaAuthRouter = createTRPCRouter({
 	mfaValidateToken: publicProcedure
 		.input(
@@ -227,10 +231,13 @@ export const mfaAuthRouter = createTRPCRouter({
 					});
 				}
 
+
+				const recoveryCodes = recoveryCodesFromJson(user.twoFactorRecoveryCodes);
+
 				// Verify the recovery code
 				const isValidRecoveryCode = await verifyRecoveryCode(
 					recoveryCode,
-					user.twoFactorRecoveryCodes,
+					recoveryCodes,
 				);
 
 				if (!isValidRecoveryCode) {
@@ -241,9 +248,12 @@ export const mfaAuthRouter = createTRPCRouter({
 				}
 
 				// Remove the used recovery code
-				const updatedRecoveryCodes = user.twoFactorRecoveryCodes.filter(
-					async (hashedCode) => !(await bcrypt.compare(recoveryCode, hashedCode)),
-				);
+				const updatedRecoveryCodes = [];
+				for (const hashedCode of recoveryCodes) {
+					if (!(await bcrypt.compare(recoveryCode, hashedCode))) {
+						updatedRecoveryCodes.push(hashedCode);
+					}
+				}
 
 				// Disable 2FA
 				await ctx.prisma.user.update({

@@ -65,13 +65,17 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
-RUN apt update && apt install -y curl sudo postgresql-client && apt clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+RUN apt update && apt install -y curl sudo ca-certificates gnupg && \
+    curl -s https://install.zerotier.com | bash && \
+    apt clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 # Update npm to latest version to suppress update notices
 RUN npm install -g npm@latest
 # need to install these package for seeding the database
 RUN npm install @prisma/client@6.16.3 @paralleldrive/cuid2
 RUN npm install -g prisma@6.16.3 ts-node
-RUN mkdir -p /var/lib/zerotier-one && chown -R nextjs:nodejs /var/lib/zerotier-one && chmod -R 777 /var/lib/zerotier-one
+RUN mkdir -p /var/lib/zerotier-one /app/data && \
+    chown -R nextjs:nodejs /var/lib/zerotier-one /app/data && \
+    chmod -R 777 /var/lib/zerotier-one /app/data
 
 COPY --from=builder /app/next.config.mjs ./
 COPY --from=builder /app/public ./public
@@ -93,6 +97,7 @@ RUN chmod u+x init-db.sh
 # USER nextjs
 
 EXPOSE 3000
+EXPOSE 9993/udp
 
 ENV PORT=3000
 

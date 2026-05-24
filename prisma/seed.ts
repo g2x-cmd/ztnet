@@ -4,7 +4,21 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+async function seedGlobalOptions() {
+	await prisma.globalOptions.upsert({
+		where: { id: 1 },
+		update: {},
+		create: {
+			id: 1,
+			enableRegistration: true,
+			firstUserRegistration: true,
+			siteName: "ZTNET",
+		},
+	});
+}
+
 async function main() {
+	await seedGlobalOptions();
 	await seedUserOptions();
 	await updateUserId();
 }

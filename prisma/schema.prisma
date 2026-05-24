@@ -2,14 +2,12 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-arm64-openssl-3.0.x"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider          = "postgresql"
-  url               = env("DATABASE_URL")
-  shadowDatabaseUrl = env("MIGRATE_DATABASE_URL")
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 enum Role {
@@ -161,12 +159,12 @@ model Account {
   userId                String
   accountId             String
   providerId            String
-  accessToken           String?   @db.Text
-  refreshToken          String?   @db.Text
+  accessToken           String?
+  refreshToken          String?
   accessTokenExpiresAt  DateTime?
   refreshTokenExpiresAt DateTime?
   scope                 String?
-  idToken               String?   @db.Text
+  idToken               String?
   password              String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @default(now()) @updatedAt
@@ -257,7 +255,7 @@ model User {
   firstTime              Boolean                @default(true)
   twoFactorEnabled       Boolean                @default(false)
   twoFactorSecret        String?
-  twoFactorRecoveryCodes String[]               @default([])
+  twoFactorRecoveryCodes Json                   @default("[]")
   failedLoginAttempts    Int                    @default(0)
   lastFailedLoginAttempt DateTime?
   requestChangePassword  Boolean                @default(false)

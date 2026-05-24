@@ -435,7 +435,7 @@ export async function onUserCreateBefore(
 				where: { id: 1 },
 				select: { enableRegistration: true },
 			});
-			if (!settings?.enableRegistration) {
+			if (settings?.enableRegistration === false) {
 				throw new APIError("FORBIDDEN", {
 					message: "registration_disabled",
 				});
@@ -462,7 +462,7 @@ export async function onUserCreateBefore(
 
 export const auth = betterAuth({
 	database: prismaAdapter(prisma, {
-		provider: "postgresql",
+		provider: "sqlite",
 	}),
 
 	// Backward compat: use existing NEXTAUTH_SECRET and NEXTAUTH_URL env vars
