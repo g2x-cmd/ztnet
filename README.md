@@ -53,6 +53,39 @@ docker compose up -d --build
 docker compose logs -f ztnet
 ```
 
+Example deployment using the GHCR image and exposing the web UI only on
+`127.0.0.1:3000` for an Nginx reverse proxy:
+
+```yaml
+services:
+  ztnet:
+    image: ghcr.io/g2x-cmd/ztnet:ztnet-sqlte
+    container_name: ztnet
+    working_dir: /app
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    volumes:
+      - /home/nexc/data/ztnet:/app/data
+      - /home/nexc/data/config:/var/lib/zerotier-one
+    ports:
+      - 127.0.0.1:3000:3000
+      - "9993:9993/udp"
+    environment:
+      DATABASE_URL: "file:/app/data/ztnet.sqlite"
+      SQLITE_DIR: "/app/data"
+      ZT_ADDR: "http://127.0.0.1:9993"
+      ZT_SECRET_FILE: "/var/lib/zerotier-one/authtoken.secret"
+      NEXTAUTH_URL: "https://your-domain.example"
+      NEXTAUTH_SECRET: "replace_with_random_32_byte_secret"
+```
+
+Point Nginx at `http://127.0.0.1:3000`; set `NEXTAUTH_URL` to the public
+URL served by Nginx. Generate a real secret with `openssl rand -base64 32`.
+
 For local Next.js testing, use a SQLite URL such as `DATABASE_URL=file:./data/ztnet.sqlite`, then run `npx prisma db push --accept-data-loss` and `npx prisma db seed` before starting the app.
 
 ## 📷 Images
