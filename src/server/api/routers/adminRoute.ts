@@ -31,6 +31,22 @@ type GlobalOptionsResponse = WithError<Omit<GlobalOptions, "smtpPassword">> & {
 	hasSmtpPassword: boolean;
 };
 
+function getSqliteDatabasePath() {
+	const dbUrl = process.env.DATABASE_URL;
+	if (!dbUrl) {
+		throw new Error("DATABASE_URL not found");
+	}
+
+	if (!dbUrl.startsWith("file:")) {
+		throw new Error("Only SQLite file databases are supported in this build");
+	}
+
+	const sqlitePath = dbUrl.slice("file:".length).split("?")[0];
+	return path.isAbsolute(sqlitePath)
+		? sqlitePath
+		: path.resolve(process.cwd(), sqlitePath);
+}
+
 export const adminRouter = createTRPCRouter({
 	updateUser: adminRoleProtectedRoute
 		.input(
@@ -1335,38 +1351,15 @@ export const adminRouter = createTRPCRouter({
 				try {
 					// Backup database
 					if (input.includeDatabase) {
-						const dbUrl = process.env.DATABASE_URL;
-						if (!dbUrl) {
-							throw new Error("DATABASE_URL not found");
-						}
-
-						if (!dbUrl.includes("postgresql")) {
-							throw new Error("Only PostgreSQL databases are supported");
-						}
-
 						try {
-							const dumpPath = path.join(tempDir, "database_dump.sql");
+							const dbPath = getSqliteDatabasePath();
+							const dumpPath = path.join(tempDir, "database.sqlite");
 
-							// Parse PostgreSQL URL
-							const url = new URL(dbUrl);
-							const host = url.hostname;
-							const port = url.port || "5432";
-							const username = url.username;
-							const password = url.password;
-							const database = url.pathname.slice(1); // Remove leading slash
+							if (!fs.existsSync(dbPath)) {
+								throw new Error("SQLite database file was not found");
+							}
 
-							// Set environment variables for pg_dump
-							const env = {
-								...process.env,
-								PGPASSWORD: password,
-							};
-
-							const dumpCommand = `pg_dump -h ${host} -p ${port} -U ${username} -d ${database} --verbose --clean --if-exists`;
-
-							execSync(`${dumpCommand} > "${dumpPath}"`, {
-								env,
-								stdio: ["pipe", "pipe", "inherit"],
-							});
+							fs.copyFileSync(dbPath, dumpPath);
 
 							// Check if dump file was created and has content
 							if (fs.existsSync(dumpPath)) {
@@ -1595,44 +1588,23 @@ export const adminRouter = createTRPCRouter({
 
 				// Restore database
 				if (input.restoreDatabase) {
-					const sqlDumpPath = path.join(extractDir, "database_dump.sql");
-					const dbUrl = process.env.DATABASE_URL;
+					const sqliteBackupPath = path.join(extractDir, "database.sqlite");
 
-					if (!dbUrl) {
-						throw new Error("DATABASE_URL not found");
-					}
-
-					if (!dbUrl.includes("postgresql")) {
-						throw new Error("Only PostgreSQL databases are supported");
-					}
-
-					if (fs.existsSync(sqlDumpPath)) {
+					if (fs.existsSync(sqliteBackupPath)) {
 						// Check dump file size
-						const dumpStats = fs.statSync(sqlDumpPath);
+						const dumpStats = fs.statSync(sqliteBackupPath);
 						if (dumpStats.size === 0) {
-							throw new Error("Database dump file is empty");
+							throw new Error("SQLite backup file is empty");
 						}
 
-						// Parse PostgreSQL URL
-						const url = new URL(dbUrl);
-						const host = url.hostname;
-						const port = url.port || "5432";
-						const username = url.username;
-						const password = url.password;
-						const database = url.pathname.slice(1); // Remove leading slash
+						const dbPath = getSqliteDatabasePath();
+						const currentBackupPath = `${dbPath}.backup.${Date.now()}`;
 
-						// Set environment variables for psql
-						const env = {
-							...process.env,
-							PGPASSWORD: password,
-						};
+						if (fs.existsSync(dbPath)) {
+							fs.copyFileSync(dbPath, currentBackupPath);
+						}
 
-						const restoreCommand = `psql -h ${host} -p ${port} -U ${username} -d ${database}`;
-
-						execSync(`${restoreCommand} < "${sqlDumpPath}"`, {
-							env,
-							stdio: ["pipe", "pipe", "inherit"],
-						});
+						fs.copyFileSync(sqliteBackupPath, dbPath);
 					}
 				}
 

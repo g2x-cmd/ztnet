@@ -281,9 +281,9 @@ export const networkRouter = createTRPCRouter({
 					(route) => route.target,
 				);
 				interface DuplicateRoutes {
-					authorId: string;
+					authorId: string | null;
 					routes: RoutesEntity[];
-					name: string;
+					name: string | null;
 				}
 
 				// check if there are any other networks with the same routes.
@@ -291,26 +291,32 @@ export const networkRouter = createTRPCRouter({
 
 				// Disabled duplicates for organization networks for now. Not sure it's needed.
 				if (targetIPs.length > 0 && !isMemberOfOrganization) {
-					duplicateRoutes = await ctx.prisma.$queryRaw<DuplicateRoutes[]>`
-					SELECT 
-						n."authorId",
-						n."name",
-						n."nwid",
-						array_agg(
-							json_build_object(
-								'id', r."id",
-								'target', r."target",
-								'via', r."via"
-							)
-						) as routes
-					FROM "network" n
-					INNER JOIN "Routes" r ON r."networkId" = n."nwid"
-					WHERE n."authorId" = ${ctx.session.user.id}
-						AND n."organizationId" IS NULL
-						AND r."target" = ANY(${targetIPs}::text[])
-						AND n."nwid" != ${input.nwid}
-					GROUP BY n."authorId", n."name", n."nwid"
-				`;
+					duplicateRoutes = await ctx.prisma.network.findMany({
+						where: {
+							authorId: ctx.session.user.id,
+							organizationId: null,
+							nwid: { not: input.nwid },
+							routes: {
+								some: {
+									target: { in: targetIPs },
+								},
+							},
+						},
+						select: {
+							authorId: true,
+							name: true,
+							routes: {
+								where: {
+									target: { in: targetIPs },
+								},
+								select: {
+									id: true,
+									target: true,
+									via: true,
+								},
+							},
+						},
+					});
 				}
 
 				// Extract duplicated IPs
