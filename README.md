@@ -1,60 +1,61 @@
-<br />
-<p align="center">
-  <a href="https://github.com/sinamics/ztnet">
-    <img src="docs/images/logo/ztnet_200x178.png" alt="Logo" width="80" height="60">
-  </a>
+# ZTNet SQLite 单容器版
 
-  <p align="center">
-    ZTNET - Self-Hosted ZeroTier network controller.
-    <br />
-    <br />
-    <a href="https://github.com/sinamics/ztnet/issues/new?assignees=&labels=bug&projects=&template=bug_template.yml&title=%5BBug%5D%3A+">Bug Report</a>
-    ·
-    <a href="https://github.com/sinamics/ztnet/issues/new?assignees=&labels=enhancement&projects=&template=feature_request.yml&title=%5BFeature+Request%5D%3A+">Feature Request</a>
-    ·
-    <a href="https://github.com/sinamics/ztnet/discussions/new/choose">Ask a Question</a>
-  </p>
-  <h3 align="center">
-    <a href="https://ztnet.network">Documentation</a>
-    ·
-    <a href="https://discord.gg/VafvyXvY58">Join our Discord</a>
-    <br />
-  </h3>
-  <div align="center">
+本仓库是基于原作者 ZTNet 项目的改版，目标是把原来的 PostgreSQL + ZeroTier 独立容器部署方式，改成更适合个人服务器、小型 VPS 和轻量自托管场景的 SQLite 单容器部署。
 
+原作者仓库：
 
-  [![GithubCI](https://github.com/sinamics/ztnet/actions/workflows/ci-tag.yml/badge.svg)](https://github.com/sinamics/ztnet/actions)
-  [![Release](https://img.shields.io/github/v/release/sinamics/ztnet.svg)](https://github.com/sinamics/ztnet/releases/latest)
-  [![Docker Pulls](https://img.shields.io/docker/pulls/sinamics/ztnet.svg)](https://hub.docker.com/r/sinamics/ztnet/)
-
-  </div>
-</p>
-<br />
-
-ZTNET - ZeroTier Controller Web UI is a robust and versatile application designed to transform the management of ZeroTier networks. Now featuring **organization** and **multi-user** support, it elevates the network management experience, accommodating team-based environments and larger organizations seamlessly.
-
-With a rich palette of features, and an intuitive user interface, ZTNET embodies a paradigm shift in network management experience. It elegantly handles the complexity, letting you focus on what you do best.
-
-### [See Installation Instruction](https://ztnet.network/installation/docker-compose)
-
-## SQLite Single-Container Variant
-
-This branch is an experimental SQLite/single-container build:
-
-- The application uses Prisma with SQLite instead of PostgreSQL.
-- `docker-compose.yml` runs one `ztnet` service and persists SQLite at `/app/data/ztnet.sqlite`.
-- The same container starts the ZeroTier daemon and stores its state in `/var/lib/zerotier-one`.
-- Fresh installs initialize the schema with `prisma db push` and seed `GlobalOptions`; existing PostgreSQL data is not migrated.
-
-Build and run with Docker Compose:
-
-```bash
-docker compose up -d --build
-docker compose logs -f ztnet
+```text
+https://github.com/sinamics/ztnet
 ```
 
-Example deployment using the GHCR image and exposing the web UI only on
-`127.0.0.1:3000` for an Nginx reverse proxy:
+英文说明已保留在：
+
+```text
+README_EN.md
+```
+
+## 这个版本适合什么场景
+
+- 个人或小团队自托管 ZeroTier 控制器管理界面。
+- 不想额外维护 PostgreSQL 数据库。
+- 希望一个容器同时运行 ZTNet Web、SQLite 数据库文件和 ZeroTier daemon。
+- 使用 Nginx、Caddy 或其他反向代理对外提供 HTTPS。
+
+不适合的场景：
+
+- 已有 PostgreSQL 生产数据并要求自动迁移到 SQLite。
+- 多实例横向扩展部署。
+- 高并发、大团队、多节点数据库共享场景。
+
+## 主要修改
+
+- 数据库从 PostgreSQL 改为 SQLite。
+- Docker Compose 从 PostgreSQL、ZeroTier、ZTNet 三容器改为单个 `ztnet` 容器。
+- SQLite 数据持久化到 `/app/data/ztnet.sqlite`。
+- ZeroTier 状态持久化到 `/var/lib/zerotier-one`。
+- 容器启动时自动初始化 SQLite schema，并确保 `GlobalOptions` 默认配置存在。
+- Prisma schema 调整为 SQLite 兼容。
+- 移除了运行时代码中的 PostgreSQL 专用 raw SQL。
+- 备份/恢复从 `pg_dump`、`psql` 改为 SQLite 文件备份/恢复。
+- Docker 镜像通过 GitHub Container Registry 发布。
+
+## 镜像地址
+
+```text
+ghcr.io/g2x-cmd/ztnet:ztnet-sqlte
+```
+
+拉取镜像：
+
+```bash
+docker pull ghcr.io/g2x-cmd/ztnet:ztnet-sqlte
+```
+
+## 推荐部署方式
+
+Web 管理界面建议只映射到宿主机本地 `127.0.0.1:3000`，再通过 Nginx 反向代理到公网域名。
+
+示例 `docker-compose.yml`：
 
 ```yaml
 services:
@@ -79,87 +80,166 @@ services:
       SQLITE_DIR: "/app/data"
       ZT_ADDR: "http://127.0.0.1:9993"
       ZT_SECRET_FILE: "/var/lib/zerotier-one/authtoken.secret"
-      NEXTAUTH_URL: "https://your-domain.example"
+      NEXTAUTH_URL: "https://ztnet.example.com"
       NEXTAUTH_SECRET: "replace_with_random_32_byte_secret"
 ```
 
-Point Nginx at `http://127.0.0.1:3000`; set `NEXTAUTH_URL` to the public
-URL served by Nginx. Generate a real secret with `openssl rand -base64 32`.
+启动：
 
-For local Next.js testing, use a SQLite URL such as `DATABASE_URL=file:./data/ztnet.sqlite`, then run `npx prisma db push --accept-data-loss` and `npx prisma db seed` before starting the app.
+```bash
+docker compose pull
+docker compose up -d
+docker logs -f ztnet
+```
 
-## 📷 Images
-View the following images for a visual overview of the ZTNet application:
-<details>
-<summary>Organization Page</summary>
+## Nginx 反向代理
 
-![Networks](docs/images/showcase/organization_layout.jpg)
+Nginx 上游地址指向：
 
-</summary>
-</details>
+```text
+http://127.0.0.1:3000
+```
 
-<details>
-<summary>Network Page</summary>
+`NEXTAUTH_URL` 必须设置成用户浏览器访问的公网地址，例如：
 
-![Networks](docs/images/showcase/network_local.jpg)
+```yaml
+NEXTAUTH_URL: "https://ztnet.example.com"
+```
 
-</summary>
-</details>
+如果 `NEXTAUTH_URL` 仍是 `http://localhost:3000`，通过公网域名访问时会出现类似错误：
 
-<details>
-<summary>Network Member Options</summary>
+```text
+Invalid origin: https://ztnet.example.com
+```
 
-![Networks](docs/images/showcase/member_options.jpg)
+## NEXTAUTH_SECRET
 
-</summary>
-</details>
+`NEXTAUTH_SECRET` 是认证系统密钥，用于保护登录 cookie、session 和认证 token。生产环境不要使用示例值。
 
-<details>
-<summary>Mail Settings</summary>
+生成随机密钥：
 
-![Networks](docs/images/showcase/admin_mail.jpg)
+```bash
+openssl rand -base64 32
+```
 
-</summary>
-</details>
+然后填入：
 
-<details>
-<summary>Platform Users</summary>
+```yaml
+NEXTAUTH_SECRET: "生成出来的随机字符串"
+```
 
-![Networks](docs/images/showcase/admin_users.jpg)
+上线后不要频繁更换该值，否则已登录用户需要重新登录。
 
-</summary>
-</details>
+## 首次注册
 
-<details>
-<summary>Controller</summary>
+全新 SQLite 数据库启动后会自动创建默认全局配置：
 
-![Networks](docs/images/showcase/admin_controller.jpg)
+```text
+enableRegistration=true
+firstUserRegistration=true
+siteName=ZTNET
+```
 
-</summary>
-</details>
+第一个注册的用户会自动成为管理员。
 
-<details>
-<summary>User Profile</summary>
+如果注册页显示异常，可以检查数据库初始化结果：
 
-![Networks](docs/images/showcase/profile.jpg)
+```bash
+docker exec -it ztnet node -e 'const {PrismaClient}=require("@prisma/client"); const p=new PrismaClient(); p.globalOptions.findFirst({where:{id:1}, select:{id:true, enableRegistration:true, firstUserRegistration:true, siteName:true}}).then(console.log).finally(()=>p.$disconnect())'
+```
 
-</summary>
-</details>
+正常应看到：
 
-<a href="https://star-history.com/#sinamics/ztnet&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=sinamics/ztnet&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=sinamics/ztnet&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=sinamics/ztnet&type=Date" />
- </picture>
-</a>
+```js
+{
+  id: 1,
+  enableRegistration: true,
+  firstUserRegistration: true,
+  siteName: 'ZTNET'
+}
+```
 
-## ⚠️ Disclaimer:
+## 数据目录
 
-Please note that ZTNet is currently in BETA. While this application aims to make managing ZeroTier networks easier, it is provided "as is" without any warranties or guarantees of any kind. As this is a beta release, you may encounter bugs or unexpected behavior. By using this application, you acknowledge and accept full responsibility for all actions and consequences resulting from its use.
-<!-- 
-## 📄 Attribution and Licensing Notice for Third-Party Components
-This project utilizes the **mkworld** tool, written in Go, to generate the custom planet file. While the original mkworld tool was developed by ZeroTier, the version we are using was adapted and re-implemented in Go by Patrick Young (@kmahyyg). This Go adaptation is licensed under the GNU General Public License v3.0. We would like to express our appreciation to Patrick Young (@kmahyyg) for his efforts in creating this Go version, which has benefited our project.
+建议持久化两个目录：
 
-Our project, in its entirety, is also licensed under the GNU General Public License v3.0. For a comprehensive understanding of our project's licensing terms, please consult our LICENSE file. -->
+```text
+/app/data
+/var/lib/zerotier-one
+```
 
+对应宿主机示例：
+
+```text
+/home/nexc/data/ztnet
+/home/nexc/data/config
+```
+
+其中：
+
+- `/app/data` 保存 SQLite 数据库。
+- `/var/lib/zerotier-one` 保存 ZeroTier identity、authtoken、planet 等状态。
+
+## 更新镜像
+
+```bash
+docker compose pull
+docker compose down
+docker compose up -d
+docker logs -f ztnet
+```
+
+如果本地缓存旧镜像，可以先删除：
+
+```bash
+docker rmi ghcr.io/g2x-cmd/ztnet:ztnet-sqlte
+docker compose pull
+docker compose up -d
+```
+
+## 本地开发测试
+
+Windows PowerShell 示例：
+
+```powershell
+$env:DATABASE_URL="file:./data/ztnet.sqlite"
+$env:NEXTAUTH_URL="http://localhost:3000"
+$env:NEXTAUTH_SECRET="dummy_key_32_chars_minimum_value"
+$env:NEXT_PUBLIC_APP_VERSION=""
+$env:ZT_ADDR="http://127.0.0.1:9993"
+$env:ZT_SECRET="dummy_secret"
+npx prisma generate
+npx prisma db push --accept-data-loss
+npx prisma db seed
+npx next dev
+```
+
+构建测试：
+
+```powershell
+$env:DATABASE_URL="file:./data/ztnet.sqlite"
+$env:NEXTAUTH_URL="http://localhost:3000"
+$env:NEXTAUTH_SECRET="dummy_key_32_chars_minimum_value"
+$env:NEXT_PUBLIC_APP_VERSION=""
+$env:ZT_ADDR="http://127.0.0.1:9993"
+$env:ZT_SECRET="dummy_secret"
+npm run build
+```
+
+## 注意事项
+
+- 这个分支不提供 PostgreSQL 到 SQLite 的自动数据迁移。
+- SQLite 数据库文件需要做好宿主机备份。
+- `9993/udp` 建议对外开放给 ZeroTier 使用。
+- Web 端口建议只绑定 `127.0.0.1`，由 Nginx 提供 HTTPS。
+- 真实生产环境必须替换 `NEXTAUTH_SECRET`。
+
+## 许可证和致谢
+
+本项目基于原作者 ZTNet 修改：
+
+```text
+https://github.com/sinamics/ztnet
+```
+
+感谢原作者和相关贡献者提供 ZTNet 项目。本改版仅针对 SQLite 单容器部署场景做适配。

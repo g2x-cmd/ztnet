@@ -1,0 +1,165 @@
+<br />
+<p align="center">
+  <a href="https://github.com/sinamics/ztnet">
+    <img src="docs/images/logo/ztnet_200x178.png" alt="Logo" width="80" height="60">
+  </a>
+
+  <p align="center">
+    ZTNET - Self-Hosted ZeroTier network controller.
+    <br />
+    <br />
+    <a href="https://github.com/sinamics/ztnet/issues/new?assignees=&labels=bug&projects=&template=bug_template.yml&title=%5BBug%5D%3A+">Bug Report</a>
+    ·
+    <a href="https://github.com/sinamics/ztnet/issues/new?assignees=&labels=enhancement&projects=&template=feature_request.yml&title=%5BFeature+Request%5D%3A+">Feature Request</a>
+    ·
+    <a href="https://github.com/sinamics/ztnet/discussions/new/choose">Ask a Question</a>
+  </p>
+  <h3 align="center">
+    <a href="https://ztnet.network">Documentation</a>
+    ·
+    <a href="https://discord.gg/VafvyXvY58">Join our Discord</a>
+    <br />
+  </h3>
+  <div align="center">
+
+
+  [![GithubCI](https://github.com/sinamics/ztnet/actions/workflows/ci-tag.yml/badge.svg)](https://github.com/sinamics/ztnet/actions)
+  [![Release](https://img.shields.io/github/v/release/sinamics/ztnet.svg)](https://github.com/sinamics/ztnet/releases/latest)
+  [![Docker Pulls](https://img.shields.io/docker/pulls/sinamics/ztnet.svg)](https://hub.docker.com/r/sinamics/ztnet/)
+
+  </div>
+</p>
+<br />
+
+ZTNET - ZeroTier Controller Web UI is a robust and versatile application designed to transform the management of ZeroTier networks. Now featuring **organization** and **multi-user** support, it elevates the network management experience, accommodating team-based environments and larger organizations seamlessly.
+
+With a rich palette of features, and an intuitive user interface, ZTNET embodies a paradigm shift in network management experience. It elegantly handles the complexity, letting you focus on what you do best.
+
+### [See Installation Instruction](https://ztnet.network/installation/docker-compose)
+
+## SQLite Single-Container Variant
+
+This branch is an experimental SQLite/single-container build:
+
+- The application uses Prisma with SQLite instead of PostgreSQL.
+- `docker-compose.yml` runs one `ztnet` service and persists SQLite at `/app/data/ztnet.sqlite`.
+- The same container starts the ZeroTier daemon and stores its state in `/var/lib/zerotier-one`.
+- Fresh installs initialize the schema with `prisma db push` and seed `GlobalOptions`; existing PostgreSQL data is not migrated.
+
+Build and run with Docker Compose:
+
+```bash
+docker compose up -d --build
+docker compose logs -f ztnet
+```
+
+Example deployment using the GHCR image and exposing the web UI only on
+`127.0.0.1:3000` for an Nginx reverse proxy:
+
+```yaml
+services:
+  ztnet:
+    image: ghcr.io/g2x-cmd/ztnet:ztnet-sqlte
+    container_name: ztnet
+    working_dir: /app
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    volumes:
+      - /home/nexc/data/ztnet:/app/data
+      - /home/nexc/data/config:/var/lib/zerotier-one
+    ports:
+      - 127.0.0.1:3000:3000
+      - "9993:9993/udp"
+    environment:
+      DATABASE_URL: "file:/app/data/ztnet.sqlite"
+      SQLITE_DIR: "/app/data"
+      ZT_ADDR: "http://127.0.0.1:9993"
+      ZT_SECRET_FILE: "/var/lib/zerotier-one/authtoken.secret"
+      NEXTAUTH_URL: "https://your-domain.example"
+      NEXTAUTH_SECRET: "replace_with_random_32_byte_secret"
+```
+
+Point Nginx at `http://127.0.0.1:3000`; set `NEXTAUTH_URL` to the public
+URL served by Nginx. Generate a real secret with `openssl rand -base64 32`.
+
+For local Next.js testing, use a SQLite URL such as `DATABASE_URL=file:./data/ztnet.sqlite`, then run `npx prisma db push --accept-data-loss` and `npx prisma db seed` before starting the app.
+
+## 📷 Images
+View the following images for a visual overview of the ZTNet application:
+<details>
+<summary>Organization Page</summary>
+
+![Networks](docs/images/showcase/organization_layout.jpg)
+
+</summary>
+</details>
+
+<details>
+<summary>Network Page</summary>
+
+![Networks](docs/images/showcase/network_local.jpg)
+
+</summary>
+</details>
+
+<details>
+<summary>Network Member Options</summary>
+
+![Networks](docs/images/showcase/member_options.jpg)
+
+</summary>
+</details>
+
+<details>
+<summary>Mail Settings</summary>
+
+![Networks](docs/images/showcase/admin_mail.jpg)
+
+</summary>
+</details>
+
+<details>
+<summary>Platform Users</summary>
+
+![Networks](docs/images/showcase/admin_users.jpg)
+
+</summary>
+</details>
+
+<details>
+<summary>Controller</summary>
+
+![Networks](docs/images/showcase/admin_controller.jpg)
+
+</summary>
+</details>
+
+<details>
+<summary>User Profile</summary>
+
+![Networks](docs/images/showcase/profile.jpg)
+
+</summary>
+</details>
+
+<a href="https://star-history.com/#sinamics/ztnet&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=sinamics/ztnet&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=sinamics/ztnet&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=sinamics/ztnet&type=Date" />
+ </picture>
+</a>
+
+## ⚠️ Disclaimer:
+
+Please note that ZTNet is currently in BETA. While this application aims to make managing ZeroTier networks easier, it is provided "as is" without any warranties or guarantees of any kind. As this is a beta release, you may encounter bugs or unexpected behavior. By using this application, you acknowledge and accept full responsibility for all actions and consequences resulting from its use.
+<!-- 
+## 📄 Attribution and Licensing Notice for Third-Party Components
+This project utilizes the **mkworld** tool, written in Go, to generate the custom planet file. While the original mkworld tool was developed by ZeroTier, the version we are using was adapted and re-implemented in Go by Patrick Young (@kmahyyg). This Go adaptation is licensed under the GNU General Public License v3.0. We would like to express our appreciation to Patrick Young (@kmahyyg) for his efforts in creating this Go version, which has benefited our project.
+
+Our project, in its entirety, is also licensed under the GNU General Public License v3.0. For a comprehensive understanding of our project's licensing terms, please consult our LICENSE file. -->
+
