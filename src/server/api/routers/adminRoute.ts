@@ -1073,11 +1073,17 @@ export const adminRouter = createTRPCRouter({
 			services: string[],
 			regex: RegExp,
 			version: 4 | 6,
-			perRequestTimeout = 2500,
+			perRequestTimeout: number,
+			totalTimeout: number,
 		): Promise<string | null> {
+			const startTime = Date.now();
 			for (const url of services) {
+				if (Date.now() - startTime >= totalTimeout) break;
 				try {
-					const res = await axios.get(url, { timeout: perRequestTimeout });
+					const remainingTimeout = totalTimeout - (Date.now() - startTime);
+					const res = await axios.get(url, {
+						timeout: Math.min(perRequestTimeout, remainingTimeout),
+					});
 					const ip = parseIpResponse(res.data, regex, version);
 					if (ip) return ip;
 				} catch {
@@ -1119,8 +1125,8 @@ export const adminRouter = createTRPCRouter({
 		}
 
 		const [publicIPv4, publicIPv6] = await Promise.all([
-			fetchFirstIp(IPV4_SERVICES, IP_REGEX, 4),
-			fetchFirstIp(IPV6_SERVICES, IPV6_REGEX, 6),
+			fetchFirstIp(IPV4_SERVICES, IP_REGEX, 4, 2500, 8000),
+			fetchFirstIp(IPV6_SERVICES, IPV6_REGEX, 6, 1200, 4000),
 		]);
 		const localIPs = getLocalIPs();
 
