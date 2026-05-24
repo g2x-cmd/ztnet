@@ -80,6 +80,35 @@ else
   echo "Database schema applied successfully!"
 fi
 
+echo "Ensuring global options exist..."
+node <<'NODE'
+const { PrismaClient } = require("@prisma/client");
+const prisma = new PrismaClient();
+
+async function main() {
+  await prisma.globalOptions.upsert({
+    where: { id: 1 },
+    update: {},
+    create: {
+      id: 1,
+      enableRegistration: true,
+      firstUserRegistration: true,
+      siteName: "ZTNET",
+    },
+  });
+}
+
+main()
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+NODE
+echo "Global options are ready."
+
 # seed the database
 echo "Seeding the database..."
 npx prisma db seed
